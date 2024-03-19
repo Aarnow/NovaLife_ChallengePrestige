@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace ChallengePrestige
+namespace ChallengePrestige.Entities
 {
     public class ChallengePrestigeTask : ModKit.ORM.ModEntity<ChallengePrestigeTask>
     {
@@ -29,7 +29,7 @@ namespace ChallengePrestige
 
             challengePrestigeTask.ItemId = item.ItemId;
             challengePrestigeTask.Quantity = qty;
-            challengePrestigeTask.Date = int.Parse(DateTime.Today.ToString("ddMMyyyy"));
+            challengePrestigeTask.Date = Utils.GetNumericalDateOfTheDay();
             challengePrestigeTask.Count = 0;
 
             if (await challengePrestigeTask.Save()) return challengePrestigeTask;

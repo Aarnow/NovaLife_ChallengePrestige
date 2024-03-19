@@ -5,6 +5,7 @@ using ModKit.Internal;
 using System.IO;
 using System.Collections.Generic;
 using ChallengePrestige.Classes;
+using ChallengePrestige.Entities;
 using Newtonsoft.Json;
 
 
@@ -34,14 +35,16 @@ namespace ChallengePrestige
         public void InitPoint()
         {
             Orm.RegisterTable<ChallengePrestigeTask>();
+            Orm.RegisterTable<ChallengePrestigePlayer>();
+            Orm.RegisterTable<ChallengePrestigeReward>();
 
             Orm.RegisterTable<ChallengePrestigeTasksPoint>();
             PointHelper.AddPattern("ChallengePrestigeTasksPoint", new ChallengePrestigeTasksPoint(false));
             AAMenu.AAMenu.menu.AddBuilder(PluginInformations, "ChallengePrestigeTasksPoint", new ChallengePrestigeTasksPoint(false), this);
 
-            Orm.RegisterTable<ChallengePrestigeShopPoint>();
-            PointHelper.AddPattern("ChallengePrestigeShopPoint", new ChallengePrestigeShopPoint(false));
-            AAMenu.AAMenu.menu.AddBuilder(PluginInformations, "ChallengePrestigeShopPoint", new ChallengePrestigeShopPoint(false), this);
+            Orm.RegisterTable<ChallengePrestigeRewardPoint>();
+            PointHelper.AddPattern("ChallengePrestigeRewardPoint", new ChallengePrestigeRewardPoint(false));
+            AAMenu.AAMenu.menu.AddBuilder(PluginInformations, "ChallengePrestigeRewardPoint", new ChallengePrestigeRewardPoint(false), this);
         }
 
         private void InitDirectory()
@@ -51,7 +54,6 @@ namespace ChallengePrestige
                 ConfigDirectoryPath = DirectoryPath + "/ChallengePrestige";
                 ConfigFilePath = Path.Combine(ConfigDirectoryPath, "tasks.json");
 
-                // Vérifiez si le répertoire parent existe, sinon créez-le
                 if (!Directory.Exists(ConfigDirectoryPath))
                 {
                     Directory.CreateDirectory(ConfigDirectoryPath);

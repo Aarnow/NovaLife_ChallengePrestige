@@ -64,13 +64,16 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ChallengePrestigeTask.cs" />
-    <Compile Include="ChallengePrestigeTasksPoint.cs" />
+    <Compile Include="Entities\ChallengePrestigePlayer.cs" />
+    <Compile Include="Entities\ChallengePrestigeReward.cs" />
+    <Compile Include="Entities\ChallengePrestigeTask.cs" />
+    <Compile Include="Points\ChallengePrestigeTasksPoint.cs" />
     <Compile Include="Classes\TaskItem.cs" />
     <Compile Include="Events.cs" />
     <Compile Include="Prestige.cs" />
-    <Compile Include="ChallengePrestigeShopPoint.cs" />
+    <Compile Include="Points\ChallengePrestigeRewardPoint.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -7,10 +7,15 @@ using ModKit.Helper.PointHelper;
 using mk = ModKit.Helper.TextFormattingHelper;
 using System.Collections.Generic;
 using System.Linq;
+using ChallengePrestige.Entities;
+using ModKit.Utils;
+using System;
+using Life;
+using Life.DB;
 
 namespace ChallengePrestige
 {
-    public class ChallengePrestigeShopPoint : ModKit.ORM.ModEntity<ChallengePrestigeShopPoint>, PatternData
+    public class ChallengePrestigeRewardPoint : ModKit.ORM.ModEntity<ChallengePrestigeRewardPoint>, PatternData
     {
         [AutoIncrement][PrimaryKey] public int Id { get; set; }
         public string TypeName { get; set; }
@@ -18,10 +23,10 @@ namespace ChallengePrestige
 
         [Ignore] public ModKit.ModKit Context { get; set; }
 
-        public ChallengePrestigeShopPoint() { }
-        public ChallengePrestigeShopPoint(bool isCreated)
+        public ChallengePrestigeRewardPoint() { }
+        public ChallengePrestigeRewardPoint(bool isCreated)
         {
-            TypeName = GetType().Name;
+            TypeName = nameof(ChallengePrestigeRewardPoint);
         }
 
         /// <summary>
@@ -33,7 +38,7 @@ namespace ChallengePrestige
             var result = await Query(patternId);
 
             Id = patternId;
-            TypeName = GetType().Name;
+            TypeName = nameof(ChallengePrestigeRewardPoint);
             PatternName = result.PatternName;
 
             //Add your other properties here
@@ -45,7 +50,7 @@ namespace ChallengePrestige
         /// <param name="player">The player interacting with the point.</param>
         public void OnPlayerTrigger(Player player)
         {
-            player.SendText("Panel des rewards");
+            PrestigePanel(player);
         }
 
         /// <summary>
@@ -66,7 +71,7 @@ namespace ChallengePrestige
         /// <param name="patternId">The ID of the pattern to be edited.</param>
         public async void EditPattern(Player player, int patternId)
         {
-            ChallengePrestigeShopPoint pattern = new ChallengePrestigeShopPoint(false);
+            ChallengePrestigeRewardPoint pattern = new ChallengePrestigeRewardPoint(false);
             pattern.Context = Context;
             await pattern.SetProperties(patternId);
 
@@ -85,6 +90,127 @@ namespace ChallengePrestige
             panel.Display();
         }
 
+        #region CUSTOM
+        public async void PrestigePanel(Player player)
+        {
+            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
+
+            Panel panel = Context.PanelHelper.Create($"Citoyens Prestigieux", UIPanel.PanelType.Text, player, () => PrestigePanel(player));
+
+
+            if (playerQuery.Count > 0)
+            {
+                panel.TextLines.Add($"Bonjour {player.GetFullName()}");
+                panel.TextLines.Add($"{mk.Color("Niveau de prestige", mk.Colors.Info)}: {playerQuery[0].Prestige}");
+                panel.TextLines.Add($"");
+                panel.TextLines.Add($"{mk.Align("Augmentez votre prestige", mk.Aligns.Left)}");
+                panel.TextLines.Add($"{mk.Align("et débloquer diverses récompenses", mk.Aligns.Left)}");
+                panel.TextLines.Add($"{mk.Align("en soutenant la commune !", mk.Aligns.Left)}");
+
+                panel.NextButton("Récompenses", () =>RewardPanel(player));
+                panel.NextButton("Classement", () =>LadderPanel(player));
+            }
+            else
+            {
+                panel.TextLines.Add($"Bienvenue {player.GetFullName()}");
+                panel.TextLines.Add("Vous ne figurez pas dans notre registre.");
+                panel.TextLines.Add("Devenez citoyen d'Amboise en prenant rendez-vous dès maintenant !");
+
+                panel.AddButton("Prendre RDV", async ui => {
+                    ChallengePrestigePlayer challengePrestigePlayer = new ChallengePrestigePlayer();
+                    challengePrestigePlayer.PlayerId = player.account.id;
+                    challengePrestigePlayer.CharacterFullName = player.GetFullName();
+                    if (await challengePrestigePlayer.Save()) panel.Refresh();
+                    else player.Notify("Oops !", "Nous ne parvenons pas à enregistrer votre rendez-vous.", Life.NotificationManager.Type.Error);
+                });
+            }
+
+            panel.CloseButton();
+
+            panel.Display();
+        }
+
+        public async void RewardPanel(Player player)
+        {
+            var rewardQuery = await ChallengePrestigeReward.QueryAll();
+            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
+
+            Panel panel = Context.PanelHelper.Create($"Récompenses", UIPanel.PanelType.TabPrice, player, () => RewardPanel(player));
+
+
+            if (playerQuery.Count > 0)
+            {
+                if (rewardQuery.Count > 0)
+                {
+                    foreach (var reward in rewardQuery)
+                    {
+                        int icon = reward.Money > 0 ? ItemUtils.getIconIdByItemId(1322) : reward.ItemId == 151 ? ItemUtils.getIconIdByItemId(1744) : ItemUtils.getIconIdByItemId(reward.ItemId);
+                        string name = reward.Money > 0 ? $"Chèque cadeau {reward.Money}€" : $"{reward.ItemQuantity} {ItemUtils.GetItemById(reward.ItemId).itemName}";
+                        var list = ListConverter.ReadJson(playerQuery[0].RewardsRecovered);
+
+                        panel.AddTabLine(name, $"{(list.Contains(reward.Id) ? "CLAIM" : $"requis: {reward.PrestigeRequired} de prestige")}", icon, async ui => {
+                            if (!list.Contains(reward.Id))
+                            {
+                                if (reward.Money == 0)
+                                {
+                                    var item = ItemUtils.GetItemById(reward.ItemId);
+                                    if (InventoryUtils.AddItem(player, reward.ItemId, reward.ItemQuantity)) player.Notify("Erreur", "Vous n'avez pas suffisament de place dans votre inventaire.", NotificationManager.Type.Error);
+                                    else player.Notify("Succès", $"Vous venez d'acquérir:\n{reward.ItemQuantity} {item.itemName}", NotificationManager.Type.Success);
+                                }
+                                else
+                                {
+                                    player.AddMoney(reward.Money, "prestige");
+                                    player.Notify("Succès", $"Vous venez d'acquérir {reward.Money}€ !", NotificationManager.Type.Success);
+                                }
+                                list.Add(reward.Id);
+                                playerQuery[0].RewardsRecovered = ListConverter.WriteJson(list);
+                                await playerQuery[0].Save();
+                                panel.Refresh();
+                            }
+                            else player.Notify("Refus", $"Vous avez déjà récupéré cette récompense", NotificationManager.Type.Error);
+                        });
+                    }
+
+                    panel.AddButton("Récupérer", async => panel.SelectTab());
+                }
+                else player.Notify("Oops !", "Nous n'avons pas pu récupérer la liste des récompenses.", Life.NotificationManager.Type.Error);
+            }
+            else player.Notify("Oops !", "Nous avons rencontré un soucis lors de votre récupération dans le registre.", Life.NotificationManager.Type.Error);
+
+            panel.PreviousButton();
+            panel.CloseButton();
+
+            panel.Display();
+        }
+
+        public async void LadderPanel(Player player)
+        {
+            var playerQuery = await ChallengePrestigePlayer.QueryAll();
+
+            Panel panel = Context.PanelHelper.Create($"Classement", UIPanel.PanelType.TabPrice, player, () => LadderPanel(player));
+
+
+            if (playerQuery.Count > 0)
+            {
+                var orderedPlayerQuery = playerQuery.OrderByDescending(instance => instance.Prestige).ToList();
+
+                for (int i = 0; i < orderedPlayerQuery.Count; i++)
+                {
+                    panel.AddTabLine($"{mk.Color($"Prestige {orderedPlayerQuery[i].Prestige}", mk.Colors.Warning)} {mk.Pos(orderedPlayerQuery[i].CharacterFullName, 40)}", _ => { });
+                }
+            }
+            else player.Notify("Oops !", "Nous avons rencontré un soucis lors de votre récupération dans le registre.", Life.NotificationManager.Type.Error);
+
+            panel.PreviousButton();
+            panel.CloseButton();
+
+            panel.Display();
+        }
+
+
+        #endregion
+
+        #region SETTERS
         /// <summary>
         /// Allows the player to set a name for the pattern, either during creation or modification.
         /// </summary>
@@ -140,6 +266,7 @@ namespace ChallengePrestige
 
             panel.Display();
         }
+        #endregion
 
         #region REPLACE YOUR CLASS/TYPE AS PARAMETER
         /// <summary>
@@ -148,7 +275,7 @@ namespace ChallengePrestige
         /// <param name="player">The player selecting the pattern.</param>
         /// <param name="patterns">The list of patterns to choose from.</param>
         /// <param name="configuring">A flag indicating if the player is configuring.</param>
-        public void SelectPattern(Player player, List<ChallengePrestigeShopPoint> patterns, bool configuring)
+        public void SelectPattern(Player player, List<ChallengePrestigeRewardPoint> patterns, bool configuring)
         {
             Panel panel = Context.PanelHelper.Create("Choisir un modèle", UIPanel.PanelType.Tab, player, () => SelectPattern(player, patterns, configuring));
 
@@ -187,7 +314,7 @@ namespace ChallengePrestige
         /// </summary>
         /// <param name="player">The player confirming the point generation.</param>
         /// <param name="pattern">The pattern to generate the point from.</param>
-        public void ConfirmGeneratePoint(Player player, ChallengePrestigeShopPoint pattern)
+        public void ConfirmGeneratePoint(Player player, ChallengePrestigeRewardPoint pattern)
         {
             Panel panel = Context.PanelHelper.Create($"Modèle \"{pattern.PatternName}\" enregistré !", UIPanel.PanelType.Text, player, () => ConfirmGeneratePoint(player, pattern));
 
@@ -227,7 +354,7 @@ namespace ChallengePrestige
             {
                 await GetPatternData(player, false);
             });
-            panel.PreviousButton();
+            panel.AddButton("Retour", ui => AAMenu.AAMenu.menu.AdminPointsPanel(player));
             panel.CloseButton();
 
             panel.Display();
@@ -290,7 +417,7 @@ namespace ChallengePrestige
         /// <param name="player">The player retrieving the NPoints.</param>
         public async Task GetNPoints(Player player)
         {
-            var points = await NPoint.Query(e => e.TypeName == GetType().Name);
+            var points = await NPoint.Query(e => e.TypeName == nameof(ChallengePrestigeRewardPoint));
             SelectNPoint(player, points);
         }
 
@@ -302,7 +429,7 @@ namespace ChallengePrestige
         public async void SelectNPoint(Player player, List<NPoint> points)
         {
             var patterns = await QueryAll();
-            Panel panel = Context.PanelHelper.Create($"Points de type {GetType().Name}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
+            Panel panel = Context.PanelHelper.Create($"Points de type {nameof(ChallengePrestigeRewardPoint)}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
 
             if (points.Count > 0)
             {

@@ -7,6 +7,8 @@ using ModKit.Helper.PointHelper;
 using mk = ModKit.Helper.TextFormattingHelper;
 using System.Collections.Generic;
 using System.Linq;
+using ChallengePrestige.Entities;
+using ModKit.Utils;
 
 namespace ChallengePrestige
 {
@@ -21,7 +23,7 @@ namespace ChallengePrestige
         public ChallengePrestigeTasksPoint() { }
         public ChallengePrestigeTasksPoint(bool isCreated)
         {
-            TypeName = GetType().Name;
+            TypeName = nameof(ChallengePrestigeTasksPoint);
         }
 
         /// <summary>
@@ -33,7 +35,7 @@ namespace ChallengePrestige
             var result = await Query(patternId);
 
             Id = patternId;
-            TypeName = GetType().Name;
+            TypeName = nameof(ChallengePrestigeTasksPoint);
             PatternName = result.PatternName;
 
             //Add your other properties here
@@ -45,7 +47,7 @@ namespace ChallengePrestige
         /// <param name="player">The player interacting with the point.</param>
         public void OnPlayerTrigger(Player player)
         {
-            player.SendText("Quete de la journée");
+            TaskPanel(player);
         }
 
         /// <summary>
@@ -85,6 +87,61 @@ namespace ChallengePrestige
             panel.Display();
         }
 
+        #region CUSTOM
+        public async void TaskPanel(Player player)
+        {
+            int today = Utils.GetNumericalDateOfTheDay();
+            var taskQuery = await ChallengePrestigeTask.Query(cpt => cpt.Date == today);
+            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
+
+            Panel panel = Context.PanelHelper.Create($"Offrande du jour", UIPanel.PanelType.Text, player, () => TaskPanel(player));
+
+            if(playerQuery.Count > 0)
+            {
+                if (taskQuery.Count > 0)
+                {
+                    if (playerQuery[0].LastTaskCompleted == taskQuery[0].Date)
+                    {
+                        panel.TextLines.Add("Merci !");
+                        panel.TextLines.Add("Vous avez déjà soutenu votre");
+                        panel.TextLines.Add("commune aujourd'hui.");
+                        panel.TextLines.Add("Revenez demain.");
+                    }
+                    else
+                    {
+                        panel.TextLines.Add($"Soutenez votre commune !");
+                        panel.TextLines.Add($"Offrir: {mk.Color(taskQuery[0].Quantity.ToString(), mk.Colors.Warning)} {mk.Color(ItemUtils.GetItemById(taskQuery[0].ItemId).itemName, mk.Colors.Warning)}");
+                        panel.TextLines.Add($"avant la fin de la journée !");
+
+                        panel.CloseButtonWithAction("Offrir", async () =>
+                        {
+                            var itemSelling = InventoryUtils.RemoveFromInventory(player, taskQuery[0].ItemId, taskQuery[0].Quantity);
+                            if (itemSelling != default)
+                            {
+                                player.Notify("Succès", $"offrande quotidienne résolue\n{mk.Size(mk.Color("Gain de Prestige !", mk.Colors.Success), 20)}", Life.NotificationManager.Type.Success);
+                                playerQuery[0].Prestige += 1;
+                                playerQuery[0].LastTaskCompleted = taskQuery[0].Date;
+                                return await playerQuery[0].Save();
+                            }
+                            else
+                            {
+                                player.Notify("Refus", "Vous n'avez pas les objets nécéssaire en nombre suffisant.");
+                                return false;
+                            }
+                        });
+                    }
+                }
+                else player.Notify("Oops !", "Nous n'avons pas pu récupérer la quête quotidienne.", Life.NotificationManager.Type.Error);
+            }
+            else panel.TextLines.Add("Pour soutenir votre commune, vous devez effectuer votre demande de recensement auprès de la mairie.");
+
+            panel.CloseButton();
+
+            panel.Display();
+        }
+        #endregion
+
+        #region SETTERS
         /// <summary>
         /// Allows the player to set a name for the pattern, either during creation or modification.
         /// </summary>
@@ -140,6 +197,7 @@ namespace ChallengePrestige
 
             panel.Display();
         }
+        #endregion
 
         #region REPLACE YOUR CLASS/TYPE AS PARAMETER
         /// <summary>
@@ -230,7 +288,7 @@ namespace ChallengePrestige
             {
                 await GetPatternData(player, false);
             });
-            panel.PreviousButton();
+            panel.AddButton("Retour", ui => AAMenu.AAMenu.menu.AdminPointsPanel(player));
             panel.CloseButton();
 
             panel.Display();
@@ -293,7 +351,7 @@ namespace ChallengePrestige
         /// <param name="player">The player retrieving the NPoints.</param>
         public async Task GetNPoints(Player player)
         {
-            var points = await NPoint.Query(e => e.TypeName == GetType().Name);
+            var points = await NPoint.Query(e => e.TypeName == nameof(ChallengePrestigeTasksPoint));
             SelectNPoint(player, points);
         }
 
@@ -305,7 +363,7 @@ namespace ChallengePrestige
         public async void SelectNPoint(Player player, List<NPoint> points)
         {
             var patterns = await QueryAll();
-            Panel panel = Context.PanelHelper.Create($"Points de type {GetType().Name}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
+            Panel panel = Context.PanelHelper.Create($"Points de type {nameof(ChallengePrestigeTasksPoint)}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
 
             if (points.Count > 0)
             {
