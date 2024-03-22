@@ -8,28 +8,26 @@ using mk = ModKit.Helper.TextFormattingHelper;
 using System.Collections.Generic;
 using System.Linq;
 using ChallengePrestige.Entities;
-using ModKit.Utils;
-using System;
-using Life;
 using Life.DB;
-using ChallengePrestige.Classes;
-using System.IO;
-using Newtonsoft.Json;
+using System;
 
-namespace ChallengePrestige
+namespace ChallengePrestige.Points
 {
-    public class ChallengePrestigeRewardPoint : ModKit.ORM.ModEntity<ChallengePrestigeRewardPoint>, PatternData
+    public class ChallengePrestigeSponsorshipPoint : ModKit.ORM.ModEntity<ChallengePrestigeSponsorshipPoint>, PatternData
     {
         [AutoIncrement][PrimaryKey] public int Id { get; set; }
         public string TypeName { get; set; }
         public string PatternName { get; set; }
 
+        //Declare your other properties here
+        [Ignore] public int minPrestige { get; set; } = 3;
+        [Ignore] public int reward { get; set; } = 2500;
         [Ignore] public ModKit.ModKit Context { get; set; }
 
-        public ChallengePrestigeRewardPoint() { }
-        public ChallengePrestigeRewardPoint(bool isCreated)
+        public ChallengePrestigeSponsorshipPoint() { }
+        public ChallengePrestigeSponsorshipPoint(bool isCreated)
         {
-            TypeName = nameof(ChallengePrestigeRewardPoint);
+            TypeName = nameof(ChallengePrestigeSponsorshipPoint);
         }
 
         /// <summary>
@@ -41,7 +39,7 @@ namespace ChallengePrestige
             var result = await Query(patternId);
 
             Id = patternId;
-            TypeName = nameof(ChallengePrestigeRewardPoint);
+            TypeName = nameof(ChallengePrestigeSponsorshipPoint);
             PatternName = result.PatternName;
 
             //Add your other properties here
@@ -53,7 +51,7 @@ namespace ChallengePrestige
         /// <param name="player">The player interacting with the point.</param>
         public void OnPlayerTrigger(Player player)
         {
-            PrestigePanel(player);
+            SponsorPanel(player);
         }
 
         /// <summary>
@@ -74,7 +72,7 @@ namespace ChallengePrestige
         /// <param name="patternId">The ID of the pattern to be edited.</param>
         public async void EditPattern(Player player, int patternId)
         {
-            ChallengePrestigeRewardPoint pattern = new ChallengePrestigeRewardPoint(false);
+            ChallengePrestigeSponsorshipPoint pattern = new ChallengePrestigeSponsorshipPoint(false);
             pattern.Context = Context;
             await pattern.SetProperties(patternId);
 
@@ -93,178 +91,6 @@ namespace ChallengePrestige
             panel.Display();
         }
 
-        #region CUSTOM
-        public async void PrestigePanel(Player player)
-        {
-            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
-
-            Panel panel = Context.PanelHelper.Create($"Citoyens Prestigieux", UIPanel.PanelType.Text, player, () => PrestigePanel(player));
-
-            if (playerQuery.Count > 0)
-            {
-                panel.TextLines.Add($"Bonjour {player.GetFullName()}");
-                panel.TextLines.Add($"{mk.Color("Niveau de prestige", mk.Colors.Info)}: {playerQuery[0].Prestige}");
-                panel.TextLines.Add($"");
-                panel.TextLines.Add($"{mk.Align("Augmentez votre prestige", mk.Aligns.Left)}");
-                panel.TextLines.Add($"{mk.Align("et débloquez diverses récompenses", mk.Aligns.Left)}");
-                panel.TextLines.Add($"{mk.Align("en soutenant la commune !", mk.Aligns.Left)}");
-
-                panel.NextButton("Récompenses", () =>RewardPanel(player));
-                panel.NextButton("Classement", () =>LadderPanel(player));
-            }
-            else
-            {
-                panel.TextLines.Add($"Bienvenue {player.GetFullName()}");
-                panel.TextLines.Add("Vous ne figurez pas dans notre registre.");
-                panel.TextLines.Add("Devenez citoyen d'Amboise en prenant rendez-vous dès maintenant !");
-
-                panel.AddButton("Prendre RDV", async ui => {
-                    ChallengePrestigePlayer challengePrestigePlayer = new ChallengePrestigePlayer();
-                    challengePrestigePlayer.PlayerId = player.account.id;
-                    challengePrestigePlayer.CharacterFullName = player.GetFullName();
-                    if (await challengePrestigePlayer.Save()) panel.Refresh();
-                    else player.Notify("Oops !", "Nous ne parvenons pas à enregistrer votre rendez-vous.", Life.NotificationManager.Type.Error);
-                });
-            }
-
-            if (player.biz.Id == Prestige.ConfigRegister.CityHallId) panel.NextButton("Registre", () => RegisterPanel(player));
-
-            panel.CloseButton();
-
-            panel.Display();
-        }
-        public async void RegisterPanel(Player player)
-        {
-            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.Prestige >= Prestige.ConfigRegister.MinPrestige && cpp.DiscordId == null);
-
-            Panel panel = Context.PanelHelper.Create($"Registre", UIPanel.PanelType.Tab, player, () => RegisterPanel(player));
-
-            foreach(var p in playerQuery)
-            {
-                panel.AddTabLine($"{p.CharacterFullName}", ui => RegisterANewPlayerPanel(player, p));
-            }
-
-            panel.NextButton("Sélectionner", () => panel.SelectTab());
-            panel.PreviousButton();
-            panel.CloseButton();
-
-            panel.Display();
-        }
-        public void RegisterANewPlayerPanel(Player player, ChallengePrestigePlayer playerToRegister)
-        {
-            Panel panel = Context.PanelHelper.Create($"Enregistrer un citoyen", UIPanel.PanelType.Input, player, () => RegisterANewPlayerPanel(player, playerToRegister));
-
-            panel.TextLines.Add($"Vous allez enregistrer {playerToRegister.CharacterFullName}");
-            panel.inputPlaceholder = "tag discord";
-
-            panel.PreviousButtonWithAction("Enregistrer", async () =>
-            {
-                if(panel.inputText != null)
-                {
-                    playerToRegister.DiscordId = panel.inputText;
-                    return await playerToRegister.Save();
-                }
-                else
-                {
-                    player.Notify("Erreur", "Vous devez indiquer le discord ID du citoyen");
-                    return false;
-                }              
-            });
-
-            panel.PreviousButton();
-            panel.CloseButton();
-
-            panel.Display();
-        }
-        public async void RewardPanel(Player player)
-        {
-            var rewardQuery = await ChallengePrestigeReward.QueryAll();
-            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
-
-            Panel panel = Context.PanelHelper.Create($"Récompenses", UIPanel.PanelType.TabPrice, player, () => RewardPanel(player));
-
-
-            if (playerQuery.Count > 0)
-            {
-                if (rewardQuery.Count > 0)
-                {
-                    var rewardQueryOrdered = rewardQuery.OrderBy(instance => instance.PrestigeRequired).ToList();
-                    foreach (var reward in rewardQueryOrdered)
-                    {
-                        int icon = reward.Money > 0 ? ItemUtils.getIconIdByItemId(1322) : reward.ItemId == 151 ? ItemUtils.getIconIdByItemId(1744) : ItemUtils.getIconIdByItemId(reward.ItemId);
-                        string name = reward.Money > 0 ? $"Chèque cadeau {reward.Money}€" : $"{reward.ItemQuantity} {ItemUtils.GetItemById(reward.ItemId).itemName}";
-                        var list = ListConverter.ReadJson(playerQuery[0].RewardsRecovered);
-
-                        panel.AddTabLine(name, $"{(list.Contains(reward.Id) ? "CLAIM" : $"requis: {reward.PrestigeRequired} de prestige")}", icon, async ui => {
-                            if (!list.Contains(reward.Id))
-                            {
-                                if (playerQuery[0].Prestige >= reward.PrestigeRequired)
-                                {
-                                    if (reward.Money == 0)
-                                    {
-                                        var item = ItemUtils.GetItemById(reward.ItemId);
-                                        if (InventoryUtils.AddItem(player, reward.ItemId, reward.ItemQuantity))
-                                        {
-                                            player.Notify("Erreur", "Vous n'avez pas suffisament de place dans votre inventaire.", NotificationManager.Type.Error);
-                                            panel.Refresh();
-                                            return;
-                                        }
-                                        else player.Notify("Succès", $"Vous venez d'acquérir:\n{reward.ItemQuantity} {item.itemName}", NotificationManager.Type.Success);
-                                    }
-                                    else
-                                    {
-                                        player.AddMoney(reward.Money, "prestige");
-                                        player.Notify("Succès", $"Vous venez d'acquérir {reward.Money}€ !", NotificationManager.Type.Success);
-                                    }
-                                    list.Add(reward.Id);
-                                    playerQuery[0].RewardsRecovered = ListConverter.WriteJson(list);
-                                    await playerQuery[0].Save();
-                                    panel.Refresh();
-                                }
-                                else player.Notify("Refus", $"Vous n'avez pas suffisament de prestige", NotificationManager.Type.Error);
-                            }
-                            else player.Notify("Refus", $"Vous avez déjà récupéré cette récompense", NotificationManager.Type.Error);
-                        });
-                    }
-
-                    panel.AddButton("Récupérer", async => panel.SelectTab());
-                }
-                else player.Notify("Oops !", "Nous n'avons pas pu récupérer la liste des récompenses.", Life.NotificationManager.Type.Error);
-            }
-            else player.Notify("Oops !", "Nous avons rencontré un soucis lors de votre récupération dans le registre.", Life.NotificationManager.Type.Error);
-
-            panel.PreviousButton();
-            panel.CloseButton();
-
-            panel.Display();
-        }
-        public async void LadderPanel(Player player)
-        {
-            var playerQuery = await ChallengePrestigePlayer.QueryAll();
-
-            Panel panel = Context.PanelHelper.Create($"Classement", UIPanel.PanelType.TabPrice, player, () => LadderPanel(player));
-
-
-            if (playerQuery.Count > 0)
-            {
-                var orderedPlayerQuery = playerQuery.OrderByDescending(instance => instance.Prestige).ToList();
-
-                for (int i = 0; i < orderedPlayerQuery.Count; i++)
-                {
-                    panel.AddTabLine($"{mk.Color($"Prestige {orderedPlayerQuery[i].Prestige}", mk.Colors.Warning)} " +
-                        $"{mk.Size($"{mk.Pos($"{(orderedPlayerQuery[i].CharacterFullName == player.GetFullName() ? mk.Color(orderedPlayerQuery[i].CharacterFullName, mk.Colors.Warning) : orderedPlayerQuery[i].CharacterFullName)}", 35)}", 13)}", _ => { });
-                }
-            }
-            else player.Notify("Oops !", "Nous avons rencontré un soucis lors de votre récupération dans le registre.", Life.NotificationManager.Type.Error);
-
-            panel.PreviousButton();
-            panel.CloseButton();
-
-            panel.Display();
-        }
-        #endregion
-
-        #region SETTERS
         /// <summary>
         /// Allows the player to set a name for the pattern, either during creation or modification.
         /// </summary>
@@ -272,7 +98,8 @@ namespace ChallengePrestige
         /// <param name="inEdition">A flag indicating if the pattern is being edited.</param>
         public void SetName(Player player, bool isEditing = false)
         {
-            Panel panel = Context.PanelHelper.Create($"{(!isEditing ? "Créer" : "Modifier")} un modèle de {TypeName}", UIPanel.PanelType.Input, player, () => SetName(player));
+            Panel panel = Context.PanelHelper.Create($"{(!isEditing ? "Créer" : "Modifier")} un modèle de {TypeName}", UIPanel.PanelType.Input, player, () =>
+            SetName(player));
 
             panel.TextLines.Add("Donner un nom à votre modèle");
             panel.inputPlaceholder = "3 caractères minimum";
@@ -284,6 +111,8 @@ namespace ChallengePrestige
                     if (panel.inputText.Length >= 3)
                     {
                         PatternName = panel.inputText;
+                        //function to call for the following property
+                        // If you want to generate your point
                         await Save();
                         ConfirmGeneratePoint(player, this);
                     }
@@ -320,6 +149,153 @@ namespace ChallengePrestige
 
             panel.Display();
         }
+
+        #region CUSTOM
+        public async void SponsorPanel(Player player)
+        {
+            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
+
+            Panel panel = Context.PanelHelper.Create($"Offrande du jour", UIPanel.PanelType.Text, player, () => SponsorPanel(player));
+            if (playerQuery.Count > 0)
+            {
+                panel.TextLines.Add("Parrainer un citoyen");
+                panel.TextLines.Add("en lui partageant votre code");
+                panel.TextLines.Add($"{mk.Color($"{Utils.GetCodeByPlayer(player.account)}", mk.Colors.Warning)}");
+
+                panel.NextButton("Filleuls", () => ReferralPanel(player));
+                panel.NextButton("Parrain", () => ReferrerPanel(player));
+            }
+            else panel.TextLines.Add("Pour accéder au système de parrainage, vous devez effectuer votre demande de recensement auprès de la mairie.");
+
+            panel.CloseButton();
+            panel.Display();
+        }
+
+        public async void ReferrerPanel(Player player)
+        {
+            var referrerList = await ChallengePrestigeSponsorship.Query(s => s.ReferralId == player.account.id);
+            var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
+
+            Panel panel = Context.PanelHelper.Create($"Parrain", referrerList.Count == 0 && playerQuery != null && playerQuery?[0].Prestige <= minPrestige ? UIPanel.PanelType.Input : UIPanel.PanelType.Text, player, () => ReferrerPanel(player));
+
+            if (referrerList.Count == 0 && playerQuery?[0].Prestige > minPrestige)
+            {
+                panel.TextLines.Add("Vous n'avez jamais eu de parrain.");
+            }
+            else if(referrerList.Count == 0 && playerQuery?[0].Prestige <= minPrestige)
+            {
+                panel.TextLines.Add("Renseigner le code de votre parrain:");
+                panel.AddButton("Confirmer", async ui =>
+                {
+                    if(ui.inputText.Length == 6 && int.TryParse(ui.inputText, out int code))
+                    {
+                        Account referrer = await LifeDB.FetchAccount(code % 10);
+                        var currentCode = Utils.GetCodeByPlayer(referrer);
+
+                        if(referrer != null && referrer.id != player.account.id)
+                        {
+                            if (currentCode == code.ToString())
+                            {
+                                ChallengePrestigeSponsorship challengePrestigeSponsorship = new ChallengePrestigeSponsorship();
+                                challengePrestigeSponsorship.ReferralId = player.account.id;
+                                challengePrestigeSponsorship.ReferrerId = referrer.id;
+                                challengePrestigeSponsorship.Date = Utils.GetNumericalDateOfTheDay();
+                                challengePrestigeSponsorship.isClaimedByReferral = false;
+                                challengePrestigeSponsorship.isClaimedByReferrer = false;
+
+                                if (await challengePrestigeSponsorship.Save())
+                                {
+                                    player.Notify("Succès", "Parrain enregistré !", Life.NotificationManager.Type.Success);
+                                    panel.Refresh();
+                                }
+                                else player.Notify("Erreur", "Nous n'avons pas pu enregistrer votre parrain", Life.NotificationManager.Type.Error);
+                            }
+                            else player.Notify("Erreur", "Code invalide", Life.NotificationManager.Type.Error);
+                        }
+                        else player.Notify("Erreur", "Parrain introuvable", Life.NotificationManager.Type.Error);
+                    }
+                    else player.Notify("Erreur", "Format du code invalide", Life.NotificationManager.Type.Error);
+                    
+                });
+            }
+            else if(referrerList.Count > 0 && referrerList[0]?.ReferrerId != null)
+            {
+                var query = await LifeDB.FetchCharacters(referrerList[0].ReferrerId);
+                panel.TextLines.Add("Votre parrain:");
+                panel.TextLines.Add($"{query[0].firstname} {query[0].lastname}");
+                panel.TextLines.Add($"");
+                if (playerQuery?[0].Prestige > minPrestige)
+                {
+                    if (!referrerList[0].isClaimedByReferral)
+                    {
+                        panel.TextLines.Add("Récupérer votre récompense");
+                        panel.AddButton("Récupérer", async ui =>
+                        {
+                            referrerList[0].isClaimedByReferral = true;
+                            if (await referrerList[0].Save())
+                            {
+                                player.AddBankMoney(reward);
+                                player.Notify("Succès", "Vous venez d'empocher 2000€ ! Merci pour votre parrainage");
+                                panel.Refresh();
+                            }
+                        });
+                    } else panel.TextLines.Add("Récompense récupérée");
+                } else
+                {
+                    panel.TextLines.Add($"Atteignez le {$"{mk.Color($"Prestige {minPrestige + 1}", mk.Colors.Warning)}"}");
+                    panel.TextLines.Add($"pour récupérer votre récompense !");
+                }
+            }
+
+            panel.PreviousButton();
+            panel.CloseButton();
+
+            panel.Display();
+        }
+
+        public async void ReferralPanel(Player player)
+        {
+            var referralList = await ChallengePrestigeSponsorship.Query(s => s.ReferrerId == player.account.id);
+            var playerList = await ChallengePrestigePlayer.QueryAll();
+
+            Panel panel = Context.PanelHelper.Create($"Filleuls", UIPanel.PanelType.Tab, player, () => ReferralPanel(player));
+
+            if(referralList.Count != 0)
+            {
+                foreach (var referral in referralList)
+                {
+                    var currentReferral = playerList.Where(p => p.PlayerId == referral.ReferralId).FirstOrDefault();
+
+                    string state = null;
+                    if (currentReferral.Prestige > minPrestige)
+                        if (referral.isClaimedByReferrer) state = "CLAIM";
+                        else state = "Prêt";
+                    else state = "En attente";
+
+                    panel.AddTabLine($"{mk.Color($"Prestige {currentReferral.Prestige}:", mk.Colors.Info)} {currentReferral.CharacterFullName} {$"{mk.Color(state, mk.Colors.Warning)}"}", async ui => {
+                        if (state == "Prêt")
+                        {
+                            referral.isClaimedByReferrer = true;
+                            if (await referral.Save())
+                            {
+                                player.AddBankMoney(reward);
+                                player.Notify("Succès", "Vous venez d'empocher 2000€ !<br> Bonne continuation de notre commune", Life.NotificationManager.Type.Success);
+                                panel.Refresh();
+                            }
+                            else player.Notify("Oops !", "Nous n'avons pas pu valider votre récompense", Life.NotificationManager.Type.Error);
+                        }
+                        else if (state == "CLAIM") player.Notify("Refus", "Vous avez déjà récupéré cette récompense", Life.NotificationManager.Type.Error); 
+                        else player.Notify("Refus", $"Votre filleul doit être prestige {minPrestige + 1} minimum pour récupérer votre récompense", Life.NotificationManager.Type.Error);
+                    });
+                }
+                panel.AddButton("Récupérer", ui => panel.SelectTab());
+            } else panel.AddTabLine("Vous n'avez pas de filleul.", _ => { });
+            
+            panel.PreviousButton();
+            panel.CloseButton();
+
+            panel.Display();
+        }
         #endregion
 
         #region REPLACE YOUR CLASS/TYPE AS PARAMETER
@@ -329,7 +305,7 @@ namespace ChallengePrestige
         /// <param name="player">The player selecting the pattern.</param>
         /// <param name="patterns">The list of patterns to choose from.</param>
         /// <param name="configuring">A flag indicating if the player is configuring.</param>
-        public void SelectPattern(Player player, List<ChallengePrestigeRewardPoint> patterns, bool configuring)
+        public void SelectPattern(Player player, List<ChallengePrestigeSponsorshipPoint> patterns, bool configuring)
         {
             Panel panel = Context.PanelHelper.Create("Choisir un modèle", UIPanel.PanelType.Tab, player, () => SelectPattern(player, patterns, configuring));
 
@@ -357,7 +333,10 @@ namespace ChallengePrestige
                 });
             }
 
-            panel.PreviousButton();
+            panel.AddButton("Retour", ui =>
+            {
+                AAMenu.AAMenu.menu.InteractionPanel(player, AAMenu.AAMenu.menu.InteractionTabLines);
+            });
             panel.CloseButton();
 
             panel.Display();
@@ -368,9 +347,10 @@ namespace ChallengePrestige
         /// </summary>
         /// <param name="player">The player confirming the point generation.</param>
         /// <param name="pattern">The pattern to generate the point from.</param>
-        public void ConfirmGeneratePoint(Player player, ChallengePrestigeRewardPoint pattern)
+        public void ConfirmGeneratePoint(Player player, ChallengePrestigeSponsorshipPoint pattern)
         {
-            Panel panel = Context.PanelHelper.Create($"Modèle \"{pattern.PatternName}\" enregistré !", UIPanel.PanelType.Text, player, () => ConfirmGeneratePoint(player, pattern));
+            Panel panel = Context.PanelHelper.Create($"Modèle \"{pattern.PatternName}\" enregistré !", UIPanel.PanelType.Text, player, () =>
+            ConfirmGeneratePoint(player, pattern));
 
             panel.TextLines.Add($"Voulez-vous générer un point sur votre position avec ce modèle \"{PatternName}\"");
 
@@ -408,7 +388,10 @@ namespace ChallengePrestige
             {
                 await GetPatternData(player, false);
             });
-            panel.AddButton("Retour", ui => AAMenu.AAMenu.menu.AdminPointsPanel(player));
+            panel.AddButton("Retour", ui =>
+            {
+                AAMenu.AAMenu.menu.AdminPointsPanel(player);
+            });
             panel.CloseButton();
 
             panel.Display();
@@ -434,7 +417,8 @@ namespace ChallengePrestige
         {
             var pattern = await Query(patternData.Id);
 
-            Panel panel = Context.PanelHelper.Create($"Supprimer un modèle de {pattern.TypeName}", UIPanel.PanelType.Text, player, () => ConfirmDeletePattern(player, patternData));
+            Panel panel = Context.PanelHelper.Create($"Supprimer un modèle de {pattern.TypeName}", UIPanel.PanelType.Text, player, () =>
+            ConfirmDeletePattern(player, patternData));
 
             panel.TextLines.Add($"Cette suppression entrainera également celle des points.");
             panel.TextLines.Add($"Êtes-vous sûr de vouloir supprimer le modèle \"{pattern.PatternName}\" ?");
@@ -471,7 +455,7 @@ namespace ChallengePrestige
         /// <param name="player">The player retrieving the NPoints.</param>
         public async Task GetNPoints(Player player)
         {
-            var points = await NPoint.Query(e => e.TypeName == nameof(ChallengePrestigeRewardPoint));
+            var points = await NPoint.Query(e => e.TypeName == nameof(ChallengePrestigeSponsorshipPoint));
             SelectNPoint(player, points);
         }
 
@@ -483,7 +467,7 @@ namespace ChallengePrestige
         public async void SelectNPoint(Player player, List<NPoint> points)
         {
             var patterns = await QueryAll();
-            Panel panel = Context.PanelHelper.Create($"Points de type {nameof(ChallengePrestigeRewardPoint)}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
+            Panel panel = Context.PanelHelper.Create($"Points de type {nameof(ChallengePrestigeSponsorshipPoint)}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
 
             if (points.Count > 0)
             {

@@ -64,9 +64,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\Register.cs" />
     <Compile Include="Entities\ChallengePrestigePlayer.cs" />
     <Compile Include="Entities\ChallengePrestigeReward.cs" />
+    <Compile Include="Entities\ChallengePrestigeSponsorship.cs" />
     <Compile Include="Entities\ChallengePrestigeTask.cs" />
+    <Compile Include="Points\ChallengePrestigeSponsorshipPoint.cs" />
     <Compile Include="Points\ChallengePrestigeTasksPoint.cs" />
     <Compile Include="Classes\TaskItem.cs" />
     <Compile Include="Events.cs" />

@@ -21,7 +21,7 @@ namespace ChallengePrestige.Entities
         public static async Task<ChallengePrestigeTask> CreateTask()
         {
             ChallengePrestigeTask challengePrestigeTask = new ChallengePrestigeTask();
-            string jsonContent = File.ReadAllText(Prestige.ConfigFilePath);
+            string jsonContent = File.ReadAllText(Prestige.ConfigTaskFilePath);
             List<TaskItem> taskItems = JsonConvert.DeserializeObject<List<TaskItem>>(jsonContent);
             Random random = new Random();
             TaskItem item = taskItems[random.Next(taskItems.Count)];
