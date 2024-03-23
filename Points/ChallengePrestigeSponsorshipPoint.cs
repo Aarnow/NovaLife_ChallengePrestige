@@ -187,14 +187,15 @@ namespace ChallengePrestige.Points
                 panel.TextLines.Add("Renseigner le code de votre parrain:");
                 panel.AddButton("Confirmer", async ui =>
                 {
-                    if(ui.inputText.Length == 6 && int.TryParse(ui.inputText, out int code))
+                    if(ui.inputText.Length >= 6)
                     {
-                        Account referrer = await LifeDB.FetchAccount(code % 10);
+                        int accountId = Utils.GetPlayerIdFromCode(ui.inputText);
+                        Account referrer = await LifeDB.FetchAccount(accountId);
                         var currentCode = Utils.GetCodeByPlayer(referrer);
 
-                        if(referrer != null && referrer.id != player.account.id)
+                        if (referrer != null && referrer.id != player.account.id)
                         {
-                            if (currentCode == code.ToString())
+                            if (currentCode == ui.inputText)
                             {
                                 ChallengePrestigeSponsorship challengePrestigeSponsorship = new ChallengePrestigeSponsorship();
                                 challengePrestigeSponsorship.ReferralId = player.account.id;
