@@ -96,7 +96,7 @@ namespace ChallengePrestige
 
             Panel panel = Context.PanelHelper.Create($"Offrande du jour", UIPanel.PanelType.Text, player, () => TaskPanel(player));
 
-            if(playerQuery.Count > 0)
+            if(playerQuery.Count > 0 && playerQuery != null)
             {
                 if (taskQuery.Count > 0)
                 {
@@ -121,6 +121,8 @@ namespace ChallengePrestige
                                 player.Notify("Succès", $"offrande quotidienne résolue\n{mk.Size(mk.Color("Gain de Prestige !", mk.Colors.Success), 20)}", Life.NotificationManager.Type.Success);
                                 playerQuery[0].Prestige += 1;
                                 playerQuery[0].LastTaskCompleted = taskQuery[0].Date;
+                                taskQuery[0].Count++;
+                                await taskQuery[0].Save();
                                 return await playerQuery[0].Save();
                             }
                             else
@@ -133,7 +135,20 @@ namespace ChallengePrestige
                 }
                 else player.Notify("Oops !", "Nous n'avons pas pu récupérer la quête quotidienne.", Life.NotificationManager.Type.Error);
             }
-            else panel.TextLines.Add("Pour soutenir votre commune, vous devez effectuer votre demande de recensement auprès de la mairie.");
+            else
+            {
+                panel.TextLines.Add($"Bienvenue {player.GetFullName()}");
+                panel.TextLines.Add("Vous ne figurez pas dans notre registre.");
+                panel.TextLines.Add("Devenez citoyen d'Amboise en prenant rendez-vous dès maintenant !");
+
+                panel.AddButton("Prendre RDV", async ui => {
+                    ChallengePrestigePlayer challengePrestigePlayer = new ChallengePrestigePlayer();
+                    challengePrestigePlayer.PlayerId = player.account.id;
+                    challengePrestigePlayer.CharacterFullName = player.GetFullName();
+                    if (await challengePrestigePlayer.Save()) panel.Refresh();
+                    else player.Notify("Oops !", "Nous ne parvenons pas à enregistrer votre rendez-vous.", Life.NotificationManager.Type.Error);
+                });
+            }
 
             panel.CloseButton();
 

@@ -100,7 +100,7 @@ namespace ChallengePrestige
 
             Panel panel = Context.PanelHelper.Create($"Citoyens Prestigieux", UIPanel.PanelType.Text, player, () => PrestigePanel(player));
 
-            if (playerQuery.Count > 0)
+            if (playerQuery.Count > 0 && playerQuery != null)
             {
                 panel.TextLines.Add($"Bonjour {player.GetFullName()}");
                 panel.TextLines.Add($"{mk.Color("Niveau de prestige", mk.Colors.Info)}: {playerQuery[0].Prestige}");
@@ -127,7 +127,7 @@ namespace ChallengePrestige
                 });
             }
 
-            if (player.biz.Id == Prestige.ConfigRegister.CityHallId) panel.NextButton("Registre", () => RegisterPanel(player));
+            if (player.biz?.Id == Prestige.ConfigRegister.CityHallId) panel.NextButton("Registre", () => RegisterPanel(player));
 
             panel.CloseButton();
 
