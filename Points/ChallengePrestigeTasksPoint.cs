@@ -90,7 +90,7 @@ namespace ChallengePrestige
         #region CUSTOM
         public async void TaskPanel(Player player)
         {
-            int today = Utils.GetNumericalDateOfTheDay();
+            int today = DateUtils.GetNumericalDateOfTheDay();
             var taskQuery = await ChallengePrestigeTask.Query(cpt => cpt.Date == today);
             var playerQuery = await ChallengePrestigePlayer.Query(cpp => cpp.PlayerId == player.account.id);
 

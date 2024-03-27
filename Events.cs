@@ -1,5 +1,6 @@
 ﻿using ChallengePrestige.Entities;
 using Life;
+using ModKit.Utils;
 
 namespace ChallengePrestige
 {
@@ -12,7 +13,7 @@ namespace ChallengePrestige
 
         public async override void OnMinutePassed()
         {
-            var today = Utils.GetNumericalDateOfTheDay();
+            var today = DateUtils.GetNumericalDateOfTheDay();
 
             if (date == default)
             {

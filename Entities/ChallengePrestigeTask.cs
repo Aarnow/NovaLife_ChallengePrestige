@@ -1,5 +1,6 @@
 ﻿using ChallengePrestige.Classes;
 using ModKit.Internal;
+using ModKit.Utils;
 using Newtonsoft.Json;
 using SQLite;
 using System;
@@ -29,7 +30,7 @@ namespace ChallengePrestige.Entities
 
             challengePrestigeTask.ItemId = item.ItemId;
             challengePrestigeTask.Quantity = qty;
-            challengePrestigeTask.Date = Utils.GetNumericalDateOfTheDay();
+            challengePrestigeTask.Date = DateUtils.GetNumericalDateOfTheDay();
             challengePrestigeTask.Count = 0;
 
             if (await challengePrestigeTask.Save()) return challengePrestigeTask;

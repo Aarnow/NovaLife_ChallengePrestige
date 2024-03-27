@@ -10,6 +10,7 @@ using System.Linq;
 using ChallengePrestige.Entities;
 using Life.DB;
 using System;
+using ModKit.Utils;
 
 namespace ChallengePrestige.Points
 {
@@ -200,7 +201,7 @@ namespace ChallengePrestige.Points
                                 ChallengePrestigeSponsorship challengePrestigeSponsorship = new ChallengePrestigeSponsorship();
                                 challengePrestigeSponsorship.ReferralId = player.account.id;
                                 challengePrestigeSponsorship.ReferrerId = referrer.id;
-                                challengePrestigeSponsorship.Date = Utils.GetNumericalDateOfTheDay();
+                                challengePrestigeSponsorship.Date = DateUtils.GetNumericalDateOfTheDay();
                                 challengePrestigeSponsorship.isClaimedByReferral = false;
                                 challengePrestigeSponsorship.isClaimedByReferrer = false;
 
