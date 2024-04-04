@@ -191,7 +191,7 @@ namespace ChallengePrestige
                     var rewardQueryOrdered = rewardQuery.OrderBy(instance => instance.PrestigeRequired).ToList();
                     foreach (var reward in rewardQueryOrdered)
                     {
-                        int icon = reward.Money > 0 ? ItemUtils.getIconIdByItemId(1322) : reward.ItemId == 151 ? ItemUtils.getIconIdByItemId(1744) : ItemUtils.getIconIdByItemId(reward.ItemId);
+                        int icon = reward.Money > 0 ? ItemUtils.GetIconIdByItemId(1322) : reward.ItemId == 151 ? ItemUtils.GetIconIdByItemId(1744) : ItemUtils.GetIconIdByItemId(reward.ItemId);
                         string name = reward.Money > 0 ? $"Chèque cadeau {reward.Money}€" : $"{reward.ItemQuantity} {ItemUtils.GetItemById(reward.ItemId).itemName}";
                         var list = ListConverter.ReadJson(playerQuery[0].RewardsRecovered);
 
